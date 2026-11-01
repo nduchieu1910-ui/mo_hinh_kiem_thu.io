@@ -1,0 +1,453 @@
+{
+  "project": "Nhóm 10 — Khung kiểm thử hợp đồng thông minh xuyên chuỗi",
+  "summary": {"total": 17, "passed": 16, "failed": 1},
+  "world": {
+    "chains": [{"name": "ChainA-EVM", "type": "EVM"}, {"name": "ChainB-UTXO", "type": "UTXO"}, {"name": "ChainM-Mock", "type": "MOCK"}, {"name": "ChainS-Solana", "type": "SOLANA"}, {"name": "LendA-EVM", "type": "EVM"}, {"name": "LendS-Solana", "type": "SOLANA"}],
+    "routes": [{"src": "ChainA-EVM", "dst": "ChainB-UTXO", "kind": "TokenBridge"}, {"src": "ChainA-EVM", "dst": "ChainM-Mock", "kind": "TokenBridge"}, {"src": "ChainA-EVM", "dst": "ChainS-Solana", "kind": "TokenBridge"}, {"src": "ChainS-Solana", "dst": "ChainA-EVM", "kind": "UnlockBridge"}, {"src": "LendA-EVM", "dst": "LendS-Solana", "kind": "LendingBridge"}, {"src": "LendS-Solana", "dst": "LendA-EVM", "kind": "UnlockBridge"}]
+  },
+  "reports": [
+    {
+      "name": "TH1_thanh_cong",
+      "description": "Alice khóa 100 ở ChainA, alice_b nhận 100 ở ChainB",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "giao dịch khóa ở ChainA", "expected": "SUCCESS", "actual": "SUCCESS", "passed": true}, 
+        {"description": "số dư 0xa11ce ở ChainA-EVM", "expected": "900", "actual": "900", "passed": true}, 
+        {"description": "số dư alice_b ở ChainB-UTXO", "expected": "100", "actual": "100", "passed": true}, 
+        {"description": "trạng thái thư #0 tuyến ChainA-EVM->ChainB-UTXO", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "0xb41d6e.lockedTotal ở ChainA-EVM", "expected": "100", "actual": "100", "passed": true}],
+      "changes": [
+        {"key": "ChainA-EVM/account/0xa11ce/balance", "before": "1000", "after": "900"}, 
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "100"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "100"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}, 
+        {"key": "ChainB-UTXO/utxo/0xc3711392b11cbbe9685ae599647a7958:0", "before": "", "after": "alice_b 100"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → alice_b (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 0, "sender": "0xa11ce", "receiver": "alice_b", "amount": "100", "hash": "17832448478737230434", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "TH2_thu_gia",
+      "description": "Thư 'phát 1 triệu' với con dấu giả bị chặn",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "relay thư giả", "expected": "FAILED", "actual": "FAILED — không đủ chữ ký hợp lệ: 0/2", "passed": true}, 
+        {"description": "lý do: không đủ chữ ký hợp lệ", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư alice_b ở ChainB-UTXO", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [],
+      "flow": [
+        {"index": 1, "from": "Thư dựng tay", "to": "Validator", "label": "kiểm thư #99 (1000000)", "status": "fail", "detail": "không đủ chữ ký hợp lệ: 0/2"}],
+      "messages": []
+    },
+    {
+      "name": "TH3_gui_lai_thu_cu",
+      "description": "Gửi lại thư nonce 0 đã thực thi bị chặn (replay)",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "relay lại thư cũ", "expected": "FAILED", "actual": "FAILED — thư đã được xử lý (replay)", "passed": true}, 
+        {"description": "lý do: replay", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư alice_b ở ChainB-UTXO", "expected": "100", "actual": "100", "passed": true}],
+      "changes": [],
+      "flow": [
+        {"index": 1, "from": "Thư dựng tay", "to": "Validator", "label": "kiểm thư #0 (100)", "status": "fail", "detail": "thư đã được xử lý (replay)"}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 0, "sender": "0xa11ce", "receiver": "alice_b", "amount": "100", "hash": "17832448478737230434", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "TH4_sai_dia_chi",
+      "description": "Người nhận 'abc' sai mẫu: thử 3 lần rồi hoàn tiền cho Alice",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "trạng thái thư #0 tuyến ChainA-EVM->ChainB-UTXO", "expected": "REFUNDED", "actual": "REFUNDED", "passed": true}, 
+        {"description": "lý do: địa chỉ sai mẫu", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư 0xa11ce ở ChainA-EVM", "expected": "1000", "actual": "1000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở ChainA-EVM", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/0", "before": "", "after": "REFUNDED sau 3 lần"}, 
+        {"key": "ChainA-EVM/account/0x0e7a/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/account/0x0e7a/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → abc (lần 1)", "status": "fail", "detail": "UTXO: địa chỉ người nhận sai mẫu: abc"}, 
+        {"index": 5, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 6, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 7, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → abc (lần 2)", "status": "fail", "detail": "UTXO: địa chỉ người nhận sai mẫu: abc"}, 
+        {"index": 8, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 9, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 10, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → abc (lần 3)", "status": "fail", "detail": "UTXO: địa chỉ người nhận sai mẫu: abc"}, 
+        {"index": 11, "from": "Relayer", "to": "ChainA-EVM", "label": "hoàn 100 cho 0xa11ce", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 0, "sender": "0xa11ce", "receiver": "abc", "amount": "100", "hash": "9667921431421367098", "status": "REFUNDED", "attempts": 3, "error": "UTXO: địa chỉ người nhận sai mẫu: abc", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích lỗi (UTXO: địa chỉ người nhận sai mẫu: abc), sẽ thử lại", "lần 2: chain đích lỗi (UTXO: địa chỉ người nhận sai mẫu: abc), sẽ thử lại", "lần 3: chain đích lỗi (UTXO: địa chỉ người nhận sai mẫu: abc), hết lượt thử", "hoàn 100 cho 0xa11ce ở chain nguồn"]}]
+    },
+    {
+      "name": "TH5_khong_du_tien",
+      "description": "Alice có 50, khóa 100 bị REVERTED, không sinh thư",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "giao dịch khóa ở ChainA", "expected": "REVERTED", "actual": "REVERTED — không đủ tiền: 0xa11ce có 50, cần 100", "passed": true}, 
+        {"description": "số thư trên tuyến ChainA-EVM->ChainB-UTXO", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "số dư 0xa11ce ở ChainA-EVM", "expected": "50", "actual": "50", "passed": true}],
+      "changes": [],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "fail", "detail": "không đủ tiền: 0xa11ce có 50, cần 100"}],
+      "messages": []
+    },
+    {
+      "name": "TH6_tieu_1_to_2_lan",
+      "description": "alice_b dùng cùng tờ 100 trả 2 người: lần 2 bị chặn",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "lần trả 1 (cho dave_bb)", "expected": "SUCCESS", "actual": "SUCCESS", "passed": true}, 
+        {"description": "lần trả 2 (cho erin_bb)", "expected": "REVERTED", "actual": "REVERTED — UTXO đã được tiêu: genesis1:0", "passed": true}, 
+        {"description": "số dư dave_bb ở ChainB-UTXO", "expected": "100", "actual": "100", "passed": true}, 
+        {"description": "số dư erin_bb ở ChainB-UTXO", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "ChainB-UTXO/utxo/genesis1:0", "before": "alice_b 100", "after": "alice_b 100 (đã tiêu)"}, 
+        {"key": "ChainB-UTXO/utxo/pay_dave:0", "before": "", "after": "dave_bb 100"}],
+      "flow": [
+        {"index": 1, "from": "Người dùng", "to": "ChainB-UTXO", "label": "giao dịch dựng sẵn pay_dave", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "Người dùng", "to": "ChainB-UTXO", "label": "giao dịch dựng sẵn pay_erin", "status": "fail", "detail": "UTXO đã được tiêu: genesis1:0"}],
+      "messages": []
+    },
+    {
+      "name": "TH7_chain_dich_hong",
+      "description": "ChainM hết gas 5 lần liên tiếp: thử 3 lần, hoàn 70 cho Alice",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "trạng thái thư #0 tuyến ChainA-EVM->ChainM-Mock", "expected": "REFUNDED", "actual": "REFUNDED", "passed": true}, 
+        {"description": "đã thử đúng 3 lần", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư 0xa11ce ở ChainA-EVM", "expected": "1000", "actual": "1000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở ChainA-EVM", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "số dư bob ở ChainM-Mock", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "ChainA-EVM->ChainM-Mock/relay/0", "before": "", "after": "REFUNDED sau 3 lần"}, 
+        {"key": "ChainA-EVM/account/0x0e7a/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/account/0x0e7a/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 70", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (70)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "ChainM-Mock", "label": "mint 70 → bob (lần 1)", "status": "fail", "detail": "hết gas"}, 
+        {"index": 5, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 6, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 7, "from": "Relayer", "to": "ChainM-Mock", "label": "mint 70 → bob (lần 2)", "status": "fail", "detail": "hết gas"}, 
+        {"index": 8, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 9, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 10, "from": "Relayer", "to": "ChainM-Mock", "label": "mint 70 → bob (lần 3)", "status": "fail", "detail": "hết gas"}, 
+        {"index": 11, "from": "Relayer", "to": "ChainA-EVM", "label": "hoàn 70 cho 0xa11ce", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainM-Mock", "nonce": 0, "sender": "0xa11ce", "receiver": "bob", "amount": "70", "hash": "13491086721220264081", "status": "REFUNDED", "attempts": 3, "error": "hết gas", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích lỗi (hết gas), sẽ thử lại", "lần 2: chain đích lỗi (hết gas), sẽ thử lại", "lần 3: chain đích lỗi (hết gas), hết lượt thử", "hoàn 70 cho 0xa11ce ở chain nguồn"]}]
+    },
+    {
+      "name": "TH9_chuyen_khu_hoi",
+      "description": "Alice chuyển 100 từ EVM sang Solana rồi chuyển về: nhận lại đủ",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "trạng thái thư #0 tuyến ChainA-EVM->ChainS-Solana", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "trạng thái thư #0 tuyến ChainS-Solana->ChainA-EVM", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "số dư 0xa11ce ở ChainA-EVM", "expected": "1000", "actual": "1000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở ChainA-EVM", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "số dư A1iceSo1ana111111111111111111111 ở ChainS-Solana", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "ChainA-EVM->ChainS-Solana/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM/account/0x0/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/account/0x0/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "0"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}, 
+        {"key": "ChainS-Solana->ChainA-EVM/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainS-Solana/account/A1iceSo1ana111111111111111111111/balance", "before": "", "after": "0"}, 
+        {"key": "ChainS-Solana/account/BridgeVau1t11111111111111111111111/balance", "before": "", "after": "100"}, 
+        {"key": "ChainS-Solana/storage/BridgeVau1t11111111111111111111111/lockedTotal", "before": "", "after": "100"}, 
+        {"key": "ChainS-Solana/storage/BridgeVau1t11111111111111111111111/outboundNonce", "before": "", "after": "1"}, 
+        {"key": "ChainS-Solana/storage/BridgeVau1t11111111111111111111111/totalMinted", "before": "", "after": "100"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "ChainS-Solana", "label": "mint 100 → A1iceSo1ana111111111111111111111 (lần 1)", "status": "ok", "detail": ""}, 
+        {"index": 5, "from": "A1iceSo1ana111111111111111111111", "to": "ChainS-Solana", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 6, "from": "ChainS-Solana", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 7, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 8, "from": "Relayer", "to": "ChainA-EVM", "label": "unlock 100 → 0xa11ce (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "100", "hash": "4082277723281228741", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "ChainS-Solana", "dst": "ChainA-EVM", "nonce": 0, "sender": "A1iceSo1ana111111111111111111111", "receiver": "0xa11ce", "amount": "100", "hash": "9517842792796004508", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "TH10_nhieu_nguoi",
+      "description": "Alice, Bob, Carol cùng chuyển sang ChainB: đúng thứ tự nonce, đúng người nhận",
+      "category": "Token Bridge",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "số thư trên tuyến ChainA-EVM->ChainB-UTXO", "expected": "3", "actual": "3", "passed": true}, 
+        {"description": "3 thư EXECUTED theo đúng nonce 0, 1, 2", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư alice_b ở ChainB-UTXO", "expected": "100", "actual": "100", "passed": true}, 
+        {"description": "số dư bob_bbb ở ChainB-UTXO", "expected": "200", "actual": "200", "passed": true}, 
+        {"description": "số dư carol_b ở ChainB-UTXO", "expected": "300", "actual": "300", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở ChainA-EVM", "expected": "600", "actual": "600", "passed": true}],
+      "changes": [
+        {"key": "ChainA-EVM/account/0xa11ce/balance", "before": "1000", "after": "900"}, 
+        {"key": "ChainA-EVM/account/0xb0b/balance", "before": "500", "after": "300"}, 
+        {"key": "ChainA-EVM/account/0xca201/balance", "before": "300", "after": "0"}, 
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/1", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/2", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb0b/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "600"}, 
+        {"key": "ChainA-EVM/account/0xca201/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "600"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "3"}, 
+        {"key": "ChainB-UTXO/utxo/0x02e44faa273c5187d5c7e61cce7233d1:0", "before": "", "after": "bob_bbb 200"}, 
+        {"key": "ChainB-UTXO/utxo/0xab877284e30220bf91e1d9b57b0d625b:0", "before": "", "after": "carol_b 300"}, 
+        {"key": "ChainB-UTXO/utxo/0xd4f6cb95bf4f5499fc232d1a1cbc3a01:0", "before": "", "after": "alice_b 100"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "0xb0b", "to": "ChainA-EVM", "label": "lock 200", "status": "ok", "detail": ""}, 
+        {"index": 4, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #1 (200)", "status": "info", "detail": ""}, 
+        {"index": 5, "from": "0xca201", "to": "ChainA-EVM", "label": "lock 300", "status": "ok", "detail": ""}, 
+        {"index": 6, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #2 (300)", "status": "info", "detail": ""}, 
+        {"index": 7, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 8, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → alice_b (lần 1)", "status": "ok", "detail": ""}, 
+        {"index": 9, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #1", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 10, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 200 → bob_bbb (lần 1)", "status": "ok", "detail": ""}, 
+        {"index": 11, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #2", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 12, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 300 → carol_b (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 0, "sender": "0xa11ce", "receiver": "alice_b", "amount": "100", "hash": "17832448478737230434", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 1, "sender": "0xb0b", "receiver": "bob_bbb", "amount": "200", "hash": "9973969185013891159", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 1", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 2, "sender": "0xca201", "receiver": "carol_b", "amount": "300", "hash": "1529005268403308374", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 2", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L1_vay_trong_han_muc",
+      "description": "Thế chấp 1000, vay 400 (tối đa 500): được vay",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "trạng thái thư #0 tuyến LendA-EVM->LendS-Solana", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "số dư A1iceSo1ana111111111111111111111 ở LendS-Solana", "expected": "400", "actual": "400", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.debt[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "400", "actual": "400", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.collateral[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "1000", "actual": "1000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở LendA-EVM", "expected": "1000", "actual": "1000", "passed": true}],
+      "changes": [
+        {"key": "LendA-EVM/account/0xa11ce/balance", "before": "5000", "after": "4000"}, 
+        {"key": "LendS-Solana/account/BridgeVau1t11111111111111111111111/balance", "before": "100000", "after": "99600"}, 
+        {"key": "LendA-EVM->LendS-Solana/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "LendA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "LendA-EVM/account/0xb41d6e/balance", "before": "", "after": "1000"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "1000"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}, 
+        {"key": "LendS-Solana/account/A1iceSo1ana111111111111111111111/balance", "before": "", "after": "400"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/collateral[A1iceSo1ana111111111111111111111]", "before": "", "after": "1000"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/debt[A1iceSo1ana111111111111111111111]", "before": "", "after": "400"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/owner[A1iceSo1ana111111111111111111111]", "before": "", "after": "0xa11ce"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "LendA-EVM", "label": "lock 1000 [borrow=400]", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "LendA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (1000)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "LendS-Solana", "label": "borrow 400 (thế chấp 1000) → A1iceSo1ana111111111111111111111 (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L2_vay_vuot_han_muc",
+      "description": "Thế chấp 1000, đòi vay 700: bị từ chối, thế chấp được hoàn",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "trạng thái thư #0 tuyến LendA-EVM->LendS-Solana", "expected": "REFUNDED", "actual": "REFUNDED", "passed": true}, 
+        {"description": "lý do: vượt hạn mức vay", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư A1iceSo1ana111111111111111111111 ở LendS-Solana", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "số dư 0xa11ce ở LendA-EVM", "expected": "5000", "actual": "5000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở LendA-EVM", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "LendA-EVM->LendS-Solana/relay/0", "before": "", "after": "REFUNDED sau 3 lần"}, 
+        {"key": "LendA-EVM/account/0x0e7a/balance", "before": "", "after": "0"}, 
+        {"key": "LendA-EVM/account/0x0e7a/nonce", "before": "", "after": "1"}, 
+        {"key": "LendA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "LendA-EVM/account/0xb41d6e/balance", "before": "", "after": "0"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "0"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "LendA-EVM", "label": "lock 1000 [borrow=700]", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "LendA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (1000)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "LendS-Solana", "label": "borrow 700 (thế chấp 1000) → A1iceSo1ana111111111111111111111 (lần 1)", "status": "fail", "detail": "vượt hạn mức vay: nợ sẽ là 700, tối đa 500"}, 
+        {"index": 5, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 6, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 7, "from": "Relayer", "to": "LendS-Solana", "label": "borrow 700 (thế chấp 1000) → A1iceSo1ana111111111111111111111 (lần 2)", "status": "fail", "detail": "vượt hạn mức vay: nợ sẽ là 700, tối đa 500"}, 
+        {"index": 8, "from": "Relayer", "to": "Relayer", "label": "chờ thử lại thư #0", "status": "info", "detail": "thử lại ở vòng sau"}, 
+        {"index": 9, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 10, "from": "Relayer", "to": "LendS-Solana", "label": "borrow 700 (thế chấp 1000) → A1iceSo1ana111111111111111111111 (lần 3)", "status": "fail", "detail": "vượt hạn mức vay: nợ sẽ là 700, tối đa 500"}, 
+        {"index": 11, "from": "Relayer", "to": "LendA-EVM", "label": "hoàn 1000 cho 0xa11ce", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "17088106468585564764", "status": "REFUNDED", "attempts": 3, "error": "vượt hạn mức vay: nợ sẽ là 700, tối đa 500", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích lỗi (vượt hạn mức vay: nợ sẽ là 700, tối đa 500), sẽ thử lại", "lần 2: chain đích lỗi (vượt hạn mức vay: nợ sẽ là 700, tối đa 500), sẽ thử lại", "lần 3: chain đích lỗi (vượt hạn mức vay: nợ sẽ là 700, tối đa 500), hết lượt thử", "hoàn 1000 cho 0xa11ce ở chain nguồn"]}]
+    },
+    {
+      "name": "L3_tra_no_nhan_lai_the_chap",
+      "description": "Trả đủ 400: thế chấp 1000 tự động trả về Alice ở EVM",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "giao dịch trả nợ trên Solana", "expected": "SUCCESS", "actual": "SUCCESS", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.debt[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "trạng thái thư #0 tuyến LendS-Solana->LendA-EVM", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "số dư 0xa11ce ở LendA-EVM", "expected": "5000", "actual": "5000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở LendA-EVM", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "LendA-EVM/account/0xa11ce/balance", "before": "4000", "after": "5000"}, 
+        {"key": "LendA-EVM/account/0xb41d6e/balance", "before": "1000", "after": "0"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/lockedTotal", "before": "1000", "after": "0"}, 
+        {"key": "LendS-Solana/account/A1iceSo1ana111111111111111111111/balance", "before": "400", "after": "0"}, 
+        {"key": "LendS-Solana/account/BridgeVau1t11111111111111111111111/balance", "before": "99600", "after": "100000"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/collateral[A1iceSo1ana111111111111111111111]", "before": "1000", "after": "0"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/debt[A1iceSo1ana111111111111111111111]", "before": "400", "after": "0"}, 
+        {"key": "LendA-EVM/account/0x0/balance", "before": "", "after": "0"}, 
+        {"key": "LendA-EVM/account/0x0/nonce", "before": "", "after": "1"}, 
+        {"key": "LendS-Solana->LendA-EVM/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/releaseNonce", "before": "", "after": "1"}],
+      "flow": [
+        {"index": 1, "from": "A1iceSo1ana111111111111111111111", "to": "LendS-Solana", "label": "repay 400", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "LendS-Solana", "to": "Relayer", "label": "sự kiện CollateralReleased #0 (1000)", "status": "info", "detail": "repaid"}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "LendA-EVM", "label": "unlock 1000 → 0xa11ce (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "LendS-Solana", "dst": "LendA-EVM", "nonce": 0, "sender": "A1iceSo1ana111111111111111111111", "receiver": "0xa11ce", "amount": "1000", "hash": "730521350656079624", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện CollateralReleased, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L4_tra_mot_phan",
+      "description": "Trả 200/400: chưa hết nợ nên thế chấp vẫn bị giữ",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "BridgeVau1t11111111111111111111111.debt[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "200", "actual": "200", "passed": true}, 
+        {"description": "số thư trên tuyến LendS-Solana->LendA-EVM", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "số dư 0xa11ce ở LendA-EVM", "expected": "4000", "actual": "4000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở LendA-EVM", "expected": "1000", "actual": "1000", "passed": true}],
+      "changes": [
+        {"key": "LendS-Solana/account/A1iceSo1ana111111111111111111111/balance", "before": "400", "after": "200"}, 
+        {"key": "LendS-Solana/account/BridgeVau1t11111111111111111111111/balance", "before": "99600", "after": "99800"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/debt[A1iceSo1ana111111111111111111111]", "before": "400", "after": "200"}],
+      "flow": [
+        {"index": 1, "from": "A1iceSo1ana111111111111111111111", "to": "LendS-Solana", "label": "repay 200", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L5_thanh_ly_khi_gia_giam",
+      "description": "Giá thế chấp giảm 60%: người thanh lý trả nợ, nhận thế chấp ở EVM",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "giao dịch thanh lý trên Solana", "expected": "SUCCESS", "actual": "SUCCESS", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.debt[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.collateral[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "0", "actual": "0", "passed": true}, 
+        {"description": "trạng thái thư #0 tuyến LendS-Solana->LendA-EVM", "expected": "EXECUTED", "actual": "EXECUTED", "passed": true}, 
+        {"description": "số dư 0x11d ở LendA-EVM", "expected": "1000", "actual": "1000", "passed": true}, 
+        {"description": "số dư 0xb41d6e ở LendA-EVM", "expected": "0", "actual": "0", "passed": true}],
+      "changes": [
+        {"key": "LendA-EVM/account/0xb41d6e/balance", "before": "1000", "after": "0"}, 
+        {"key": "LendA-EVM/storage/0xb41d6e/lockedTotal", "before": "1000", "after": "0"}, 
+        {"key": "LendS-Solana/account/BridgeVau1t11111111111111111111111/balance", "before": "99600", "after": "100000"}, 
+        {"key": "LendS-Solana/account/Liquidatr11111111111111111111111/balance", "before": "2000", "after": "1600"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/collateral[A1iceSo1ana111111111111111111111]", "before": "1000", "after": "0"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/debt[A1iceSo1ana111111111111111111111]", "before": "400", "after": "0"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/priceX100", "before": "100", "after": "40"}, 
+        {"key": "LendA-EVM/account/0x0/balance", "before": "", "after": "0"}, 
+        {"key": "LendA-EVM/account/0x0/nonce", "before": "", "after": "1"}, 
+        {"key": "LendA-EVM/account/0x11d/balance", "before": "", "after": "1000"}, 
+        {"key": "LendS-Solana->LendA-EVM/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "LendS-Solana/storage/BridgeVau1t11111111111111111111111/releaseNonce", "before": "", "after": "1"}],
+      "flow": [
+        {"index": 1, "from": "Liquidatr11111111111111111111111", "to": "LendS-Solana", "label": "liquidate 400 → A1iceSo1ana111111111111111111111", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "LendS-Solana", "to": "Relayer", "label": "sự kiện CollateralReleased #0 (1000)", "status": "info", "detail": "liquidated"}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "LendA-EVM", "label": "unlock 1000 → 0x11d (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "LendS-Solana", "dst": "LendA-EVM", "nonce": 0, "sender": "A1iceSo1ana111111111111111111111", "receiver": "0x11d", "amount": "1000", "hash": "7458699175729651113", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện CollateralReleased, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L6_gui_lai_thu_tra_the_chap",
+      "description": "Gửi lại thư trả thế chấp để rút 2 lần: bị chặn replay",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "relay lại thư trả thế chấp", "expected": "FAILED", "actual": "FAILED — thư đã được xử lý (replay)", "passed": true}, 
+        {"description": "lý do: replay", "expected": "đúng", "actual": "đúng", "passed": true}, 
+        {"description": "số dư 0xa11ce ở LendA-EVM", "expected": "5000", "actual": "5000", "passed": true}],
+      "changes": [],
+      "flow": [
+        {"index": 1, "from": "Thư dựng tay", "to": "Validator", "label": "kiểm thư #0 (1000)", "status": "fail", "detail": "thư đã được xử lý (replay)"}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}, 
+        {"src": "LendS-Solana", "dst": "LendA-EVM", "nonce": 0, "sender": "A1iceSo1ana111111111111111111111", "receiver": "0xa11ce", "amount": "1000", "hash": "10414622852742389990", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện CollateralReleased, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "L7_thanh_ly_khi_con_an_toan",
+      "description": "Giá chưa giảm mà đòi thanh lý: bị từ chối, nợ giữ nguyên",
+      "category": "Lending",
+      "passed": true, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "giao dịch thanh lý trên Solana", "expected": "REVERTED", "actual": "REVERTED — khoản vay còn an toàn, chưa thể thanh lý: nợ 400, ngưỡng 800", "passed": true}, 
+        {"description": "BridgeVau1t11111111111111111111111.debt[A1iceSo1ana111111111111111111111] ở LendS-Solana", "expected": "400", "actual": "400", "passed": true}, 
+        {"description": "số dư Liquidatr11111111111111111111111 ở LendS-Solana", "expected": "2000", "actual": "2000", "passed": true}],
+      "changes": [],
+      "flow": [
+        {"index": 1, "from": "Liquidatr11111111111111111111111", "to": "LendS-Solana", "label": "liquidate 400 → A1iceSo1ana111111111111111111111", "status": "fail", "detail": "khoản vay còn an toàn, chưa thể thanh lý: nợ 400, ngưỡng 800"}],
+      "messages": [
+        {"src": "LendA-EVM", "dst": "LendS-Solana", "nonce": 0, "sender": "0xa11ce", "receiver": "A1iceSo1ana111111111111111111111", "amount": "1000", "hash": "6964546419021718781", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    },
+    {
+      "name": "TH8_co_y_sai",
+      "description": "Mong đợi sai có chủ đích (alice_b có 999) để chứng minh RevertState",
+      "category": "Kiểm tra RevertState",
+      "passed": false, "reverted": true, "error": "",
+      "assertions": [
+        {"description": "số dư alice_b ở ChainB-UTXO", "expected": "999", "actual": "100", "passed": false}],
+      "changes": [
+        {"key": "ChainA-EVM/account/0xa11ce/balance", "before": "1000", "after": "900"}, 
+        {"key": "ChainA-EVM->ChainB-UTXO/relay/0", "before": "", "after": "EXECUTED sau 1 lần"}, 
+        {"key": "ChainA-EVM/account/0xa11ce/nonce", "before": "", "after": "1"}, 
+        {"key": "ChainA-EVM/account/0xb41d6e/balance", "before": "", "after": "100"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/lockedTotal", "before": "", "after": "100"}, 
+        {"key": "ChainA-EVM/storage/0xb41d6e/outboundNonce", "before": "", "after": "1"}, 
+        {"key": "ChainB-UTXO/utxo/0xaaf5bfdf2dc74d9fd3c2dee93645efc0:0", "before": "", "after": "alice_b 100"}],
+      "flow": [
+        {"index": 1, "from": "0xa11ce", "to": "ChainA-EVM", "label": "lock 100", "status": "ok", "detail": ""}, 
+        {"index": 2, "from": "ChainA-EVM", "to": "Relayer", "label": "sự kiện Locked #0 (100)", "status": "info", "detail": ""}, 
+        {"index": 3, "from": "Relayer", "to": "Validator", "label": "kiểm chữ ký thư #0", "status": "ok", "detail": "đủ chữ ký"}, 
+        {"index": 4, "from": "Relayer", "to": "ChainB-UTXO", "label": "mint 100 → alice_b (lần 1)", "status": "ok", "detail": ""}],
+      "messages": [
+        {"src": "ChainA-EVM", "dst": "ChainB-UTXO", "nonce": 0, "sender": "0xa11ce", "receiver": "alice_b", "amount": "100", "hash": "17832448478737230434", "status": "EXECUTED", "attempts": 1, "error": "", "log": ["nhận sự kiện Locked, dựng thư nonce 0", "lần 1: chain đích thực thi thành công"]}]
+    }
+  ]
+}
